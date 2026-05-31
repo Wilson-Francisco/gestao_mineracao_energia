@@ -1,0 +1,42 @@
+
+services:
+  # 1. SERVIDOR DE MENSAGERIA (RabbitMQ Broker)
+  # Responsável por amortecer e garantir a entrega das telemetrias dos turnos do BelAZ-75306
+  rabbit_broker:
+    image: rabbitmq:3-management
+    container_name: minera_rabbit
+    ports:
+      - "5672:5672"   # Porta de comunicação interna AMQP utilizada pelo Go Collector e Server
+      - "15672:15672" # Painel administrativo Web para gerenciar filas via navegador
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  # 2. BANCO DE SÉRIES TEMPORAIS (TimescaleDB)
+  # Armazena as telemetrias brutas e processa as visões consolidadas de turnos e diárias (Fadrão МИСИС)
+  timescale_db:
+    image: timescale/timescaledb:latest-pg15
+    container_name: minera_db
+    ports:
+      - "5432:5432"   # Porta de comunicação padrão utilizada pelo Go e Python
+    environment:
+      - POSTGRES_DB=energy_management
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=mineracao_secure_2026
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+
+  # 3. SERVIDOR DE GOVERNANÇA E MLOPS (MLflow Server)
+  # Centraliza o registro de experimentos, hiperparâmetros e armazena o modelo campeão da frota
+  mlflow_server:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: minera_mlflow
+    ports:
+      - "5000:5000"   # Porta do painel Web do MLflow para auditoria visual de modelos
+    volumes:
+      - mlruns_data:/mlruns
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlruns
+
+volumes:
+  timescale_data:
+  mlruns_data:

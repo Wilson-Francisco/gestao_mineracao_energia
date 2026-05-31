@@ -1,0 +1,18 @@
+# Ambientes virtuais Python (Locais)
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Arquivos temporários de IDEs (VS Code / Windows)
+.vscode/
+.idea/
+Thumbs.db
+
+# Arquivos de imagem exportados localmente pelo Dashboard
+*.png
+*.jpg
+
+# Banco de dados local e artefatos de experimentos do MLflow (Crucial)
+mlruns/
+mlflow.db
