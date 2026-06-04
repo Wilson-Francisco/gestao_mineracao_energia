@@ -120,33 +120,62 @@ def executar_teste_shapiro_wilk(valores, alpha=0.05):
     return w_estatistica, p_valor, veredicto
 
 
+
+def conduzir_auditoria_turnos_gauss(df_filtrado):
+    """
+    Parte 3.3: Segrega a base de dados por Turnos e Diário, aplicando
+    as análises de forma e os testes inferenciais de hipótese isoladamente.
+    """
+    # Mapeamento dos grupos analíticos conforme exigido pela МИСИС
+    escopos = {
+        "1º Turno (Smena 1 - Diurno)": df_filtrado[df_filtrado['smena'] == 'Smena 1'],
+        "2º Turno (Smena 2 - Noturno)": df_filtrado[df_filtrado['smena'] == 'Smena 2'],
+        "Consolidado Diário (Сутки)": df_filtrado
+    }
+    
+    for rotulo, df_grupo in escopos.items():
+        print("\n" + "-"*75)
+        print(f"DIAGNÓSTICO DE GAUSS: {rotulo.upper()}")
+        print("-"*75)
+        
+        if len(df_grupo) < 3:
+            print(" -> [Aviso] Dados insuficientes neste turno para conduzir análises inferenciais.")
+            continue
+            
+        valores = df_grupo['efficiency_w_spec'].to_numpy()
+        
+        # Executa as Partes 3.1 e 3.2 criadas anteriormente
+        mu, sigma, skew, kurt = calcular_indicadores_forma_gauss(valores)
+        w_stat, p_val, veredicto = executar_teste_shapiro_wilk(valores)
+        
+        print(f"  -> Média Operacional (μ)             : {mu:.4f} g/t·km")
+        print(f"  -> Desvio Padrão Amostral (σ)        : {sigma:.4f} g/t·km")
+        print(f"  -> Coeficiente de Assimetria (Skew)   : {skew:.4f}")
+        print(f"  -> Coeficiente de Curtose (Kurtosis)  : {kurt:.4f}")
+        print(f"  -> Teste de Shapiro-Wilk (p-value)    : {p_val:.6f}")
+        print(f"  -> Veredicto da Lei de Gauss          : {veredicto}")
+        print("-"*75)
+
+
+
+
+
 if __name__ == "__main__":
     print("\n" + "="*75)
-    print("TESTE DE HIPÓTESE DE SHAPIRO-WILK")
+    print("SEGREGAÇÃO E AUDITORIA DE TURNOS (ПАКУЭ)")
     print("="*75)
     
     try:
+        # Ingestão de dados
         df_bruto = carregar_dados_historicos()
         if len(df_bruto) > 0:
+            # Filtro de Grubbs
             df_filtrado = aplicar_filtro_grubbs_nativo(df_bruto, 'efficiency_w_spec')
-            valores_consumo = df_filtrado['efficiency_w_spec'].to_numpy()
             
-            # Executa os indicadores de forma (Parte 3.1)
-            mu, sigma, skew, kurt = calcular_indicadores_forma_gauss(valores_consumo)
-            
-            # Executa o novo teste de hipótese (Parte 3.2)
-            w_stat, p_val, veredicto = executar_teste_shapiro_wilk(valores_consumo)
-            
-            print(f"\n [Diagnóstico de Gauss] Forma da Curva:")
-            print(f" -> Média (μ): {mu:.4f} | Desvio Padrão (σ): {sigma:.4f}")
-            print(f" -> Assimetria (Skew): {skew:.4f} | Curtose: {kurt:.4f}")
-            
-            print(f"\n🔬 [Teste Inferencial] Veredicto Estatístico:")
-            print(f" -> Estatística W de Teste           : {w_stat:.4f}")
-            print(f" -> Valor-p Probabilístico (p-value) : {p_val:.6f}")
-            print(f" -> Resultado do Teste de Hipótese    : {veredicto}")
-            print("="*75 + "\n")
+            # Executa o loop de auditoria segregado por Turnos
+            conduzir_auditoria_turnos_gauss(df_filtrado)
+            print("\n" + "="*75 + "\n")
         else:
-            print("[Aviso] Banco de dados vazio.")
+            print("[Aviso] Banco de dados vazio. Execute a ingestão em Go.")
     except Exception as e:
-        print(f"[Erro] Falha no teste da Parte 3.2: {e}")       
+        print(f"[Erro] Falha no teste da Parte 3.3: {e}")
