@@ -96,29 +96,57 @@ def calcular_indicadores_forma_gauss(valores):
     return media, desvio_padrao, assimetria, curtose
 
 
+
+def executar_teste_shapiro_wilk(valores, alpha=0.05):
+    
+    """
+    Executa o Teste de Hipótese de Shapiro-Wilk para atestar
+    a conformidade estatística com a Distribuição Normal de Gauss.
+    H0: Os dados seguem uma Distribuição Normal.
+    H1: Os dados possuem desvios significativos de normalidade.
+    """
+    if len(valores) < 3:
+        return 0.0, 0.0, "Dados Insuficientes"
+
+    # Executa o teste estatístico da biblioteca scipy
+    w_estatistica, p_valor = stats.shapiro(valores)
+    
+    # Avaliação da hipótese com base no nível de significância de 5%
+    if p_valor > alpha:
+        veredicto = "ACEITA H0 (Dados Normais/Gaussianos)"
+    else:
+        veredicto = "REJEITA H0 (Dados Não-Gaussianos/Com Ruído)"
+        
+    return w_estatistica, p_valor, veredicto
+
+
 if __name__ == "__main__":
     print("\n" + "="*75)
-    print("TESTE DOS INDICADORES DE FORMA DE GAUSS")
+    print("TESTE DE HIPÓTESE DE SHAPIRO-WILK")
     print("="*75)
     
     try:
         df_bruto = carregar_dados_historicos()
         if len(df_bruto) > 0:
             df_filtrado = aplicar_filtro_grubbs_nativo(df_bruto, 'efficiency_w_spec')
-            
-            # Extrai os valores escalares do consumo específico para o teste
             valores_consumo = df_filtrado['efficiency_w_spec'].to_numpy()
             
-            # Executa a nova função da Parte 3.1
+            # Executa os indicadores de forma (Parte 3.1)
             mu, sigma, skew, kurt = calcular_indicadores_forma_gauss(valores_consumo)
             
-            print(f"\n [Diagnóstico de Gauss] Resultados da Amostra:")
-            print(f" -> Média Operacional (μ)             : {mu:.4f} g/t·km")
-            print(f" -> Desvio Padrão Amostral (σ)        : {sigma:.4f} g/t·km")
-            print(f" -> Coeficiente de Assimetria (Skew)   : {skew:.4f}")
-            print(f" -> Coeficiente de Curtose (Kurtosis)  : {kurt:.4f}")
+            # Executa o novo teste de hipótese (Parte 3.2)
+            w_stat, p_val, veredicto = executar_teste_shapiro_wilk(valores_consumo)
+            
+            print(f"\n [Diagnóstico de Gauss] Forma da Curva:")
+            print(f" -> Média (μ): {mu:.4f} | Desvio Padrão (σ): {sigma:.4f}")
+            print(f" -> Assimetria (Skew): {skew:.4f} | Curtose: {kurt:.4f}")
+            
+            print(f"\n🔬 [Teste Inferencial] Veredicto Estatístico:")
+            print(f" -> Estatística W de Teste           : {w_stat:.4f}")
+            print(f" -> Valor-p Probabilístico (p-value) : {p_val:.6f}")
+            print(f" -> Resultado do Teste de Hipótese    : {veredicto}")
             print("="*75 + "\n")
         else:
-            print("[Aviso] Banco de dados vazio. Execute a ingestão em Go.")
+            print("[Aviso] Banco de dados vazio.")
     except Exception as e:
-        print(f"[Erro] Falha no teste da Parte 3.1: {e}")       
+        print(f"[Erro] Falha no teste da Parte 3.2: {e}")       
