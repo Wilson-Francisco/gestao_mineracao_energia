@@ -209,7 +209,7 @@ try:
             
             st.markdown("💡 *Deseja visualizar a auditoria analítica completa de perdas e lucros com cartões executivos?*")
             if st.button("Ir para Página Financeira Completa"):
-                st.switch_page("pages/financeiro.py")
+                st.switch_page("pages/http://localhost:8503")
     else:
         st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem.")
         
