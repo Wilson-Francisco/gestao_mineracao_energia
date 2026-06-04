@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 def conectar_banco():
-    """Conecta de forma segura ao banco TimescaleDB local no Docker (Fase 1)"""
+    """Conecta de forma segura ao banco TimescaleDB local no Docker"""
     return psycopg2.connect(
         host="localhost", database="energy_management",
         user="admin", password="mineracao_secure_2026", port="5432"
@@ -94,16 +94,15 @@ def carregar_modelo_dashboard_mlflow():
         return mlflow.sklearn.load_model(f"runs:/{run_id_campeao}/modelo_linear_misis")
     except Exception:
         return None
+    
 
 
 # =============================================================================
-# CONSTRUÇÃO DA INTERFACE VISUAL COMPLETA 
+# LAYOUT VISUAL COM ISOLAMENTO DE TELA CONDICIONAL (ПАКУЭ)
 # =============================================================================
 try:
-    st.title("🚚 Sistema ПАКУЭ — Monitoramento Energético BelAZ-75306")
-    st.markdown("Análise gráfica e financeira unificada de indicadores de transporte conforme o padrão regulatório **МИСИС**.")
-
-    # Barra lateral de filtros
+    # Criação do controle de abas no topo do ecrã para variação dinâmica de modo
+ # Usamos st.radio estilizado de forma horizontal para capturar o clique do usuário antes de renderizar os blocos
     st.sidebar.header("⚙️ Configurações de Auditoria")
     filtro_tempo = st.sidebar.selectbox(
         "Selecione o Escopo de Consolidação:",
@@ -112,154 +111,158 @@ try:
     st.sidebar.markdown("---")
     st.sidebar.info("💡 Interface integrada a nível de banco com atualizações contínuas.")
 
-    # Carga dos dados integrados chamando as funções da Parte 1
+    # Injeção do menu horizontal seletor na linha principal do ecrã
+    modo_visualizacao = st.radio(
+        "📋 Selecione o Painel de Análise Operacional:",
+        ["⚡ Consumo Específico", "🛢️ Consumo Energético", "🏋️ Volume de Trabalho", "💰 Relatório Financeiro"],
+        horizontal=True
+    )
+    st.markdown("---")
+
+    # Carga dos dados do banco
     producao_kpi, consumo_kpi, eficiencia_kpi = buscar_metricas_consolidadas(filtro_tempo)
     total_alertas = buscar_total_alertas_ia()
     modelo_linear = carregar_modelo_dashboard_mlflow()
     dados_planta = buscar_dados_brutos(filtro_tempo)
     df_alertas_logs = buscar_tabela_alertas()
-    
-    # Renderização dos Cards de KPIs (Métricas superiores)
-    st.subheader(f"📊 Indicadores Consolidados: {filtro_tempo.upper()}")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric(label="TRABALHO DE TRANSPORTE ACUMULADO", value=f"{producao_kpi:,.2f} t·km")
-    with col2: st.metric(label="MASSA DE DIESEL CONSUMIDA", value=f"{consumo_kpi:,.4f} t")
-    with col3: st.metric(label="CONSUMO ESPECÍFICO REAL", value=f"{eficiencia_kpi:,.2f} g/t·km")
-    with col4: st.metric(label="ANOMALIAS CAPTURADAS POR I.A.", value=f"{total_alertas} Eventos")
-        
-    st.markdown("---")
-    
-    # Painel de Abas horizontais interativas para seleção de gráficos na mesma linha
-    st.subheader("📈 Painel Dinâmico de Performance e Resultados")
-    
-    aba_especifico, aba_energetico, aba_volume, aba_financeiro = st.tabs([
-        "⚡ Consumo Específico", 
-        "🛢️ Consumo Energético", 
-        "🏋️ Volume de Trabalho",
-        "💰 Relatório Financeiro (Lucros e Perdas)"
-    ])
-    
-    if len(dados_planta) > 0:
-        dados_planta['timestamp'] = pd.to_datetime(dados_planta['timestamp'])
-        eixo_x_datas = dados_planta['timestamp'].dt.strftime('%d.%m').to_numpy()
-        
-        Q_bruto = dados_planta['production_q'].to_numpy()
-        W_bruto = dados_planta['consumption_w'].to_numpy()
-        w_spec_real = dados_planta['efficiency_w_spec'].to_numpy()
-        
-        # Executa a inferência da I.A. carregada do MLflow (Fase 5)
-        matriz_entrada = dados_planta[['production_q', 'consumption_w']].to_numpy()
-        w_spec_predito = modelo_linear.predict(matriz_entrada) if modelo_linear is not None else np.zeros_like(w_spec_real)
-        
-        sns.set_theme(style="whitegrid")
-        
-        with aba_especifico:
-            fig, ax = plt.subplots(figsize=(11, 4.0))
-            ax.plot(eixo_x_datas, w_spec_real, color="#1E90FF", marker='o', linewidth=2, label="Real (Fazenda/Факт)")
-            ax.plot(eixo_x_datas, w_spec_predito, color="#FF4500", marker='o', linewidth=2, label="Alvo I.A. (Planejado/Плановое)")
-            ax.set_ylabel("Específico [g/t·km]", fontsize=10)
-            ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
-            ax.legend(loc="upper right", frameon=True, facecolor="white")
-            st.pyplot(fig)
-            
-        with aba_energetico:
-            fig, ax = plt.subplots(figsize=(11, 4.0))
-            ax.plot(eixo_x_datas, W_bruto, color="#1E90FF", marker='o', linewidth=2, label="Gasto de Óleo Diesel [t]")
-            ax.set_ylabel("Consumo Absoluto [t]", fontsize=10)
-            ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
-            ax.legend(loc="upper right", frameon=True, facecolor="white")
-            st.pyplot(fig)
-            
-        with aba_volume:
-            fig, ax = plt.subplots(figsize=(11, 4.0))
-            ax.plot(eixo_x_datas, Q_bruto, color="#1E90FF", marker='o', linewidth=2, label="Trabalho de Transporte (Volume)")
-            ax.axhline(0, color="#FF4500", linestyle='-', linewidth=1.5)
-            ax.set_ylabel("Volume Trabalho [t·km]", fontsize=10)
-            ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
-            ax.legend(loc="upper right", frameon=True, facecolor="white")
-            st.pyplot(fig)
-            
-        with aba_financeiro:
-            # =========================================================================
-            # INTEGRAÇÃO COMPLETA: CENTRAL DE ANÁLISE FINANCEIRA DA МИСИС (LUCROS E PERDAS)
-            # =========================================================================
-            st.markdown("### 💰 Avaliação da Eficiência em Expressão Financeira")
-            st.markdown("Cálculo do impacto monetário baseado na fórmula oficial da página 48 do manual da universidade.")
-            
-            TARIFA_COMBUSTIVEL = 6.00
-            
-            # Busca os dados reais consolidados direto do banco pelas views de turno
-            q_s1, _, w_f1 = buscar_metricas_consolidadas("1º Turno (Smena 1 - Diurno)")
-            q_s2, _, w_f2 = buscar_metricas_consolidadas("2º Turno (Smena 2 - Noturno)")
-            w_p1, w_p2 = 52.50, 54.00  # Metas lineares estabelecidas de rampa
-            
-            # Aplicação da Equação: Economia/Perda = ((w_plan - w_fact) * Q * Tarifa) / 1.000.000
-            ganho_s1 = ((w_p1 - w_f1) * q_s1 * TARIFA_COMBUSTIVEL) / 1000000.0
-            ganho_s2 = ((w_p2 - w_f2) * q_s2 * TARIFA_COMBUSTIVEL) / 1000000.0
-            ganho_total_diario = ganho_s1 + ganho_s2
-            
-            # Sub-layout interno de Cards Executivos de Lucro e Perda
-            f_col1, f_col2, f_col3 = st.columns(3)
-            with f_col1:
-                st.metric(label="BALANÇO FINANCEIRO - 1º TURNO", value=f"R$ {ganho_s1:,.2f}", 
-                          delta="Economia (Lucro)" if ganho_s1 >= 0 else "Sobreconsumo (Perda)",
-                          delta_color="normal" if ganho_s1 >= 0 else "inverse")
-            with f_col2:
-                st.metric(label="BALANÇO FINANCEIRO - 2º TURNO", value=f"R$ {ganho_s2:,.2f}", 
-                          delta="Economia (Lucro)" if ganho_s2 >= 0 else "Sobreconsumo (Perda)",
-                          delta_color="normal" if ganho_s2 >= 0 else "inverse")
-            with f_col3:
-                st.metric(label="IMPACTO TOTAL CONSOLIDADO (СУТКИ)", value=f"R$ {ganho_total_diario:,.2f}", 
-                          delta="Saldo Positivo" if ganho_total_diario >= 0 else "Saldo Negativo",
-                          delta_color="off")
-            
-            st.markdown("---")
-            
-            # Matriz de dados formatada idêntica à planilha oficial da МИСИС
-            matriz_misis = {
-                "Indicador Operacional (ПАКУЭ)": [
-                    "Consumo Alvo I.A. [w_plan]", "Consumo Real Médio [w_fact]", 
-                    "Eficiência Diferencial [Δ w]", "Trabalho de Transporte Real [Q]", 
-                    "Resultado Financeiro do Lote"
-                ],
-                "1º Turno (Смена 1)": [
-                    f"{w_p1:.2f} g/t·km", f"{w_f1:.2f} g/t·km", f"{(w_p1 - w_f1):.2f} g/t·km",
-                    f"{q_s1:,.2f} t·km", f"R$ {ganho_s1:,.2f}"
-                ],
-                "2º Turno (Смена 2)": [
-                    f"{w_p2:.2f} g/t·km", f"{w_f2:.2f} g/t·km", f"{(w_p2 - w_f2):.2f} g/t·km",
-                    f"{q_s2:,.2f} t·km", f"R$ {ganho_s2:,.2f}"
-                ]
-            }
-            st.table(pd.DataFrame(matriz_misis))
-            
-            # Destorques e Alertas Visuais Baseados na Lei de Gauss de Lucros
-            if ganho_total_diario >= 0:
-                st.success(f"📈 SUCESSO INDUSTRIAL: A operação gerou uma economia líquida de R$ {ganho_total_diario:,.2f} para a mineradora devido à alta eficiência de condução da frota.")
-            else:
-                st.error(f"ALERTA FINANCEIRO: O desvio operacional resultou em um prejuízo de R$ {abs(ganho_total_diario):,.2f} no custo de óleo diesel.")
-    else:
-        st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem.")
-        
-    st.markdown("---")
-    
-    # Central de Alertas e Visão Geral de Telemetria
-    b_col1, b_col2 = st.columns(2)
-    with b_col1:
-        st.subheader("🚨 Central de Alertas Críticos de Ineficiência")
-        if len(df_alertas_logs) == 0:
-            st.info("Nenhuma anomalia de sobreconsumo registrada pelo modelo de I.A.")
-        else:
-            for idx, row in df_alertas_logs.iterrows():
-                st.error(f"⚠️ **Ativo BelAZ ID: {row['asset_id']}** | {row['timestamp']} | **{row['severity']}**\n\n{row['description']}")
-    with b_col2:
-        st.subheader("📋 Últimas Telemetrias Recebidas (Visão Geral):")
-        st.dataframe(dados_planta.tail(5), use_container_width=True)
 
-    # Ciclo contínuo de auto-refresh de 5 segundos
+    # -----------------------------------------------------------------
+    # SE O USUÁRIO CLICAR NO RELATÓRIO FINANCEIRO
+    # -----------------------------------------------------------------
+    if modo_visualizacao == "💰 Relatório Financeiro":
+        # RENDERIZA APENAS E EXCLUSIVAMENTE O RELATÓRIO FINANCEIRO
+        st.title("💰 Avaliação da Eficiência em Expressão Financeira")
+        st.markdown("Cálculo do impacto Financeiro.")
+        
+        TARIFA_COMBUSTIVEL = 6.00
+        
+        # Computação matemática da fórmula
+        q_s1, _, w_f1 = buscar_metricas_consolidadas("1º Turno (Smena 1 - Diurno)")
+        q_s2, _, w_f2 = buscar_metricas_consolidadas("2º Turno (Smena 2 - Noturno)")
+        w_p1, w_p2 = 52.50, 54.00
+        
+        ganho_s1 = ((w_p1 - w_f1) * q_s1 * TARIFA_COMBUSTIVEL) / 1000000.0
+        ganho_s2 = ((w_p2 - w_f2) * q_s2 * TARIFA_COMBUSTIVEL) / 1000000.0
+        ganho_total_diario = ganho_s1 + ganho_s2
+        
+        # Cards Executivos Monetários exclusivos da visão financeira
+        f_col1, f_col2, f_col3 = st.columns(3)
+        with f_col1:
+            st.metric(label="BALANÇO FINANCEIRO - 1º TURNO", value=f"R$ {ganho_s1:,.2f}", 
+                      delta="Economia (Lucro)" if ganho_s1 >= 0 else "Sobreconsumo (Perda)",
+                      delta_color="normal" if ganho_s1 >= 0 else "inverse")
+        with f_col2:
+            st.metric(label="BALANÇO FINANCEIRO - 2º TURNO", value=f"R$ {ganho_s2:,.2f}", 
+                      delta="Economia (Lucro)" if ganho_s2 >= 0 else "Sobreconsumo (Perda)",
+                      delta_color="normal" if ganho_s2 >= 0 else "inverse")
+        with f_col3:
+            st.metric(label="IMPACTO TOTAL CONSOLIDADO (СУТКИ)", value=f"R$ {ganho_total_diario:,.2f}", 
+                      delta="Saldo Positivo" if ganho_total_diario >= 0 else "Saldo Negativo",
+                      delta_color="off")
+        
+        st.markdown("---")
+        
+        # Renderização da tabela oficial no ecrã
+        matriz_misis = {
+            "Indicador Operacional (ПАКУЭ)": [
+                "Consumo Alvo I.A. [w_plan]", "Consumo Real Médio [w_fact]", 
+                "Eficiência Diferencial [Δ w]", "Trabalho de Transporte Real [Q]", 
+                "Resultado Financeiro do Lote"
+            ],
+            "1º Turno (Смена 1)": [
+                f"{w_p1:.2f} g/t·km", f"{w_f1:.2f} g/t·km", f"{(w_p1 - w_f1):.2f} g/t·km",
+                f"{q_s1:,.2f} t·km", f"R$ {ganho_s1:,.2f}"
+            ],
+            "2º Turno (Смена 2)": [
+                f"{w_p2:.2f} g/t·km", f"{w_f2:.2f} g/t·km", f"{(w_p2 - w_f2):.2f} g/t·km",
+                f"{q_s2:,.2f} t·km", f"R$ {ganho_s2:,.2f}"
+            ]
+        }
+        st.table(pd.DataFrame(matriz_misis))
+        
+        if ganho_total_diario >= 0:
+            st.success(f"📈 SUCESSO INDUSTRIAL: A operação gerou uma economia líquida de R$ {ganho_total_diario:,.2f} para a mineradora devido à alta eficiência de condução.")
+        else:
+            st.error(f"📉 ALERTA FINANCEIRO: O desvio operacional resultou em um prejuízo oculto de R$ {abs(ganho_total_diario):,.2f} no custo de combustível.")
+
+    # -----------------------------------------------------------------
+    # SE O USUÁRIO CLICAR EM QUALQUER ABA TÉCNICA
+    # -----------------------------------------------------------------
+    else:
+        # EXIBE OS TÍTULOS TÉCNICOS E OS CARDS SUPERIORES QUE VOCÊ MANDOU TIRAR DO FINANCEIRO
+        st.subheader(f"📊 Indicadores Consolidados do Camiao: {filtro_tempo.upper()}")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1: st.metric(label="TRABALHO DE TRANSPORTE ACUMULADO", value=f"{producao_kpi:,.2f} t·km")
+        with col2: st.metric(label="MASSA DE DIESEL CONSUMIDA", value=f"{consumo_kpi:,.4f} t")
+        with col3: st.metric(label="CONSUMO ESPECÍFICO REAL", value=f"{eficiencia_kpi:,.2f} g/t·km")
+        with col4: st.metric(label="ANOMALIAS CAPTURADAS POR I.A.", value=f"{total_alertas} Eventos")
+            
+        st.markdown("---")
+        
+        if len(dados_planta) > 0:
+            dados_planta['timestamp'] = pd.to_datetime(dados_planta['timestamp'])
+            eixo_x_datas = dados_planta['timestamp'].dt.strftime('%d.%m').to_numpy()
+            
+            Q_bruto = dados_planta['production_q'].to_numpy()
+            W_bruto = dados_planta['consumption_w'].to_numpy()
+            w_spec_real = dados_planta['efficiency_w_spec'].to_numpy()
+            
+            matriz_entrada = dados_planta[['production_q', 'consumption_w']].to_numpy()
+            w_spec_predito = modelo_linear.predict(matriz_entrada) if modelo_linear is not None else np.zeros_like(w_spec_real)
+            
+            sns.set_theme(style="whitegrid")
+            
+            # Renderização isolada do gráfico correspondente à seleção
+            if modo_visualizacao == "⚡ Consumo Específico":
+                st.subheader("📈 Gráfico de Consumo Específico Real vs Linha de Base I.A.")
+                fig, ax = plt.subplots(figsize=(11, 4.0))
+                ax.plot(eixo_x_datas, w_spec_real, color="#1E90FF", marker='o', linewidth=2, label="Real")
+                ax.plot(eixo_x_datas, w_spec_predito, color="#FF4500", marker='o', linewidth=2, label=" I.A Planejado")
+                ax.set_ylabel("Específico [g/t·km]", fontsize=10)
+                ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+                ax.legend(loc="upper right", frameon=True, facecolor="white")
+                st.pyplot(fig)
+                
+            elif modo_visualizacao == "🛢️ Consumo Energético":
+                st.subheader("📈 Gráfico de Gasto Energético Absoluto (Diesel)")
+                fig, ax = plt.subplots(figsize=(11, 4.0))
+                ax.plot(eixo_x_datas, W_bruto, color="#1E90FF", marker='o', linewidth=2, label="Gasto de Óleo Diesel [t]")
+                ax.set_ylabel("Consumo Absoluto [t]", fontsize=10)
+                ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+                ax.legend(loc="upper right", frameon=True, facecolor="white")
+                st.pyplot(fig)
+                
+            elif modo_visualizacao == "🏋️ Volume de Trabalho":
+                st.subheader("📈 Gráfico de Volume de Trabalho de Transporte Útil")
+                fig, ax = plt.subplots(figsize=(11, 4.0))
+                ax.plot(eixo_x_datas, Q_bruto, color="#1E90FF", marker='o', linewidth=2, label="Trabalho de Transporte (Volume)")
+                ax.axhline(0, color="#FF4500", linestyle='-', linewidth=1.5)
+                ax.set_ylabel("Volume Trabalho [t·km]", fontsize=10)
+                ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+                ax.legend(loc="upper right", frameon=True, facecolor="white")
+                st.pyplot(fig)
+        else:
+            st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem.")
+            
+        st.markdown("---")
+        
+        # EXIBE A CENTRAL DE ALERTAS E TELEMETRIA APENAS SE NÃO ESTIVER NO MODO FINANCEIRO
+        b_col1, b_col2 = st.columns(2)
+        with b_col1:
+            st.subheader("🚨 Central de Alertas Críticos de Ineficiência")
+            if len(df_alertas_logs) == 0:
+                st.info("Nenhuma anomalia de sobreconsumo registrada pelo modelo de I.A.")
+            else:
+                for idx, row in df_alertas_logs.iterrows():
+                    st.error(f"⚠️ **Ativo BelAZ ID: {row['asset_id']}** | {row['timestamp']} | **{row['severity']}**\n\n{row['description']}")
+        with b_col2:
+            st.subheader("📋 Últimas Telemetrias Recebidas (Visão Geral):")
+            st.dataframe(dados_planta.tail(5), use_container_width=True)
+
+    # Ciclo contínuo de auto-refresh de 5 segundos comum para ambos os modos
     time.sleep(5)
     st.rerun()
 
-# Fechamento seguro do bloco try/except contra erros de compilação
 except Exception as e:
-    st.error(f"Erro ao renderizar o ecossistema analítico e de abas do Dashboard: {e}")
+    st.error(f"Erro ao renderizar o ecossistema analítico isolado do Dashboard: {e}")
+

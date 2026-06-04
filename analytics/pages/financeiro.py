@@ -1,8 +1,7 @@
 import streamlit as st
 import psycopg2
 import pandas as pd
-import numpy as nil
-
+import numpy as np
 st.set_page_config(
     page_title="ПАКУЭ - Análise Financeira",
     page_icon="💰",
@@ -25,8 +24,8 @@ def extrair_balanco_financeiro_view(view_name):
     cursor.close()
     conn.close()
     
-    prod_q = float(res[0]) if res and res[0] is not nil else 0.0
-    cons_w = float(res[1]) if res and res[1] is not nil else 0.0
+    prod_q = float(res[0]) if res and res[0] is not np else 0.0
+    cons_w = float(res[1]) if res and res[1] is not np else 0.0
     w_fact = (cons_w * 1000000.0) / prod_q if prod_q > 0 else 0.0
     return prod_q, w_fact
 
