@@ -75,17 +75,50 @@ def aplicar_filtro_grubbs_nativo(df, coluna_alvo, alpha=0.05):
     print(f" -> Filtragem concluída! Outliers removidos em '{coluna_alvo}': {contador_remocoes}")
     return df_limpo
 
+
+def calcular_indicadores_forma_gauss(valores):
+    """
+    Calcula os indicadores inferenciais de forma da curva
+    para avaliar a aderência matemática à Lei de Gauss.
+    """
+    if len(valores) < 3:
+        return 0.0, 0.0, 0.0, 0.0
+
+    media = float(np.mean(valores))
+    desvio_padrao = float(np.std(valores, ddof=1))
+    
+    # Assimetria (Skewness): Mede a distorção lateral em relação à curva de Gauss
+    assimetria = float(stats.skew(valores))
+    
+    # Curtose (Kurtosis): Mede o achatamento ou pico da curva do sensor
+    curtose = float(stats.kurtosis(valores))
+    
+    return media, desvio_padrao, assimetria, curtose
+
+
 if __name__ == "__main__":
-    print("\n" + "="*70)
-    print("📊 FASE 5: EXTRAÇÃO DE DADOS E FILTRAGEM DE OUTLIERS DE GAUSS")
-    print("="*70)
+    print("\n" + "="*75)
+    print("TESTE DOS INDICADORES DE FORMA DE GAUSS")
+    print("="*75)
     
     try:
         df_bruto = carregar_dados_historicos()
         if len(df_bruto) > 0:
             df_filtrado = aplicar_filtro_grubbs_nativo(df_bruto, 'efficiency_w_spec')
-            print(f"[Sucesso] Amostra estável finalizada: {len(df_filtrado)} linhas prontas para análise.")
+            
+            # Extrai os valores escalares do consumo específico para o teste
+            valores_consumo = df_filtrado['efficiency_w_spec'].to_numpy()
+            
+            # Executa a nova função da Parte 3.1
+            mu, sigma, skew, kurt = calcular_indicadores_forma_gauss(valores_consumo)
+            
+            print(f"\n [Diagnóstico de Gauss] Resultados da Amostra:")
+            print(f" -> Média Operacional (μ)             : {mu:.4f} g/t·km")
+            print(f" -> Desvio Padrão Amostral (σ)        : {sigma:.4f} g/t·km")
+            print(f" -> Coeficiente de Assimetria (Skew)   : {skew:.4f}")
+            print(f" -> Coeficiente de Curtose (Kurtosis)  : {kurt:.4f}")
+            print("="*75 + "\n")
         else:
-            print("[Aviso] A Hypertable está vazia. Rode o Go Collector/Server para gerar dados.")
+            print("[Aviso] Banco de dados vazio. Execute a ingestão em Go.")
     except Exception as e:
-        print(f"[Erro Pipeline] Falha na execução da Parte 2: {e}")
+        print(f"[Erro] Falha no teste da Parte 3.1: {e}")       
