@@ -10,13 +10,13 @@ import time
 
 # 1. Configuração estrita do Layout Web da página do Streamlit
 st.set_page_config(
-    page_title="Painel de Controle BelAZ-75306",
+    page_title="ПАКУЭ - Painel de Controle BelAZ-75306",
     page_icon="🚚",
     layout="wide"
 )
 
 def conectar_banco():
-    """Conecta de forma segura ao banco TimescaleDB local no Docker"""
+    """Conecta de forma segura ao banco TimescaleDB local no Docker (Fase 1)"""
     return psycopg2.connect(
         host="localhost", database="energy_management",
         user="admin", password="mineracao_secure_2026", port="5432"
@@ -94,9 +94,9 @@ def carregar_modelo_dashboard_mlflow():
     except Exception:
         return None
 
-# --- CONSTRUÇÃO DA INTERFACE VISUAL (PADRÃO REFORMULADO ПАКУЭ) ---
+# --- CONSTRUÇÃO DA INTERFACE VISUAL (PADRÃO INTERATIVO ПАКУЭ) ---
 st.title("🚚 Sistema ПАКУЭ — Monitoramento Energético BelAZ-75306")
-st.markdown("Análise gráfica unificada de indicadores industriais de transporte conforme o padrão regulatório **МИСИС**.")
+st.markdown("Análise gráfica interativa de indicadores industriais de transporte conforme o padrão regulatório **МИСИС**.")
 
 st.sidebar.header("⚙️ Configurações de Auditoria")
 filtro_tempo = st.sidebar.selectbox(
@@ -123,9 +123,16 @@ try:
     st.markdown("---")
     
     # -----------------------------------------------------------------
-    # REFATORAÇÃO: PLOTAGEM DO PAINEL DE GRÁFICOS TRIPLO VERTICAL
+    # SELEÇÃO DINÂMICA DE GRÁFICOS POR ABAS NO TOPO
     # -----------------------------------------------------------------
-    st.subheader("📈 Painel Unificado de Controle Operacional (MИСИС - ПАКУЭ)")
+    st.subheader("📈 Gráfico Analítico de Performance")
+    
+    # Cria as 3 opções interativas em formato de abas horizontais no topo do gráfico
+    aba_especifico, aba_energetico, aba_volume = st.tabs([
+        "⚡ Consumo Específico", 
+        "🛢️ Consumo Energético", 
+        "🏋️ Volume de Trabalho"
+    ])
     
     if len(dados_planta) > 0:
         dados_planta['timestamp'] = pd.to_datetime(dados_planta['timestamp'])
@@ -135,39 +142,40 @@ try:
         W_bruto = dados_planta['consumption_w'].to_numpy()
         w_spec_real = dados_planta['efficiency_w_spec'].to_numpy()
         
-        # Executa a inferência ao vivo da I.A. para gerar a linha alvo
+        # Inferência da I.A. para a linha alvo
         matriz_entrada = dados_planta[['production_q', 'consumption_w']].to_numpy()
         w_spec_predito = modelo_linear.predict(matriz_entrada) if modelo_linear is not None else np.zeros_like(w_spec_real)
         
-        # Cria a figura com 3 subplots empilhados verticalmente compartilhando o eixo X
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(11, 8), sharex=True)
         sns.set_theme(style="whitegrid")
         
-        # --- GRÁFICO 1: Volume de Trabalho de Transporte [t·km] ---
-        ax1.plot(eixo_x_datas, Q_bruto, color="#1E90FF", marker='o', linewidth=1.8, label="Trabalho de Transporte (Произв. показатель)")
-        ax1.axhline(0, color="#FF4500", linestyle='-', linewidth=1.2) # Linha vermelha base da imagem
-        ax1.set_ylabel("Volume [t·km]", fontsize=9)
-        ax1.title.set_text("1. Trabalho de Transporte Real Coletado")
-        
-        # --- GRÁFICO 2: Gasto Energético Absoluto [t] ---
-        ax2.plot(eixo_x_datas, W_bruto, color="#1E90FF", marker='o', linewidth=1.8, label="Gasto de Óleo Diesel")
-        ax2.set_ylabel("Consumo [t]", fontsize=9)
-        ax2.title.set_text("2. Consumo Absoluto de Massa de Combustível")
-        
-        # --- GRÁFICO 3: Consumo Específico Real vs Meta I.A. [g/t·km] ---
-        ax3.plot(eixo_x_datas, w_spec_real, color="#1E90FF", marker='o', linewidth=1.8, label="Real (Факт)")
-        ax3.plot(eixo_x_datas, w_spec_predito, color="#FF4500", marker='o', linewidth=1.8, label="Alvo I.A. (Плановое)")
-        ax3.set_ylabel("Específico [g/t·km]", fontsize=9)
-        ax3.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
-        ax3.title.set_text("3. Eficiência de Ciclo: Consumo Específico Real vs Linha de Base I.A.")
-        ax3.legend(loc="upper right", frameon=True, facecolor="white")
-        
-        # Ajustes de layout para rotular o eixo X de forma limpa
-        plt.xticks(rotation=0)
-        plt.tight_layout()
-        st.pyplot(fig)
+        # --- SELEÇÃO DE VISUALIZAÇÃO BASEADA NO CLIQUE DO USUÁRIO ---
+        with aba_especifico:
+            fig, ax = plt.subplots(figsize=(11, 4.2))
+            ax.plot(eixo_x_datas, w_spec_real, color="#1E90FF", marker='o', linewidth=2, label="Real (Факт)")
+            ax.plot(eixo_x_datas, w_spec_predito, color="#FF4500", marker='o', linewidth=2, label="Alvo I.A. (Плановое)")
+            ax.set_ylabel("Específico [g/t·km]", fontsize=10)
+            ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+            ax.legend(loc="upper right", frameon=True, facecolor="white")
+            st.pyplot(fig)
+            
+        with aba_energetico:
+            fig, ax = plt.subplots(figsize=(11, 4.2))
+            ax.plot(eixo_x_datas, W_bruto, color="#1E90FF", marker='o', linewidth=2, label="Gasto de Óleo Diesel [t]")
+            ax.set_ylabel("Consumo Absoluto [t]", fontsize=10)
+            ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+            ax.legend(loc="upper right", frameon=True, facecolor="white")
+            st.pyplot(fig)
+            
+        with aba_volume:
+            fig, ax = plt.subplots(figsize=(11, 4.2))
+            ax.plot(eixo_x_datas, Q_bruto, color="#1E90FF", marker='o', linewidth=2, label="Trabalho de Transporte (Произв. показатель)")
+            ax.axhline(0, color="#FF4500", linestyle='-', linewidth=1.5)
+            ax.set_ylabel("Volume Trabalho [t·km]", fontsize=10)
+            ax.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+            ax.legend(loc="upper right", frameon=True, facecolor="white")
+            st.pyplot(fig)
     else:
-        st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem do painel triplo.")
+        st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem.")
         
     st.markdown("---")
     
