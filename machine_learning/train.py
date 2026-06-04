@@ -2,12 +2,16 @@ import psycopg2
 import pandas as pd
 import numpy as np
 from scipy import stats
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_absolute_error
 import os
 import mlflow
 import mlflow.sklearn
 
 def conectar_banco():
-    """Conecta ao TimescaleDB local no Docker de forma offline (Fase 1)"""
+    """Conecta ao TimescaleDB local no Docker de forma offline"""
     return psycopg2.connect(
         host="localhost",
         database="energy_management",
@@ -125,10 +129,10 @@ def executar_teste_shapiro_wilk(valores, alpha=0.05):
 
 def conduzir_auditoria_turnos_gauss(df_filtrado):
     """
-    Parte 3.3: Segrega a base de dados por Turnos e Diário, aplicando
+    Segrega a base de dados por Turnos e Diário, aplicando
     as análises de forma e os testes inferenciais de hipótese isoladamente.
     """
-    # Mapeamento dos grupos analíticos conforme exigido pela МИСИС
+    # Mapeamento dos grupos analíticos conforme exigido
     escopos = {
         "1º Turno (Smena 1 - Diurno)": df_filtrado[df_filtrado['smena'] == 'Smena 1'],
         "2º Turno (Smena 2 - Noturno)": df_filtrado[df_filtrado['smena'] == 'Smena 2'],
@@ -191,22 +195,93 @@ def inicializar_governanca_mlflow():
     return id_experimento
 
 
+def executar_treinamento_e_registro_mlflow(df_filtrado):
+    """
+    Divide os dados, treina a Regressao Linear (Principal) e o 
+    Random Forest (Comparativo), registrando metricas e artefatos no MLflow.
+    """
+    print("\n" + "="*75)
+    print("[I.A. - Treinamento] Iniciando modelagem preditiva...")
+    print("="*75)
+
+    # 1. Definicao das Variaveis Multariaveis
+    # Matriz X: Trabalho de Transporte [t·km] e Consumo [t]
+    X = df_filtrado[['production_q', 'consumption_w']].to_numpy()
+    # Vetor y: Consumo Especifico Real [g/t·km]
+    y = df_filtrado['efficiency_w_spec'].to_numpy()
+
+    # Divisao padrao de mercado: 80% para aprendizado e 20% para teste/validacao
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # 2. Inicializacao da Corrida de Monitoramento (Run) no MLflow
+    with mlflow.start_run(run_name="Treinamento_Modelos_BelAZ"):
+        
+        # --- MODELO 1: REGRESSÃO LINEAR MÚLTIPLA (PRINCIPAL) ---
+        print(" -> Treinando Modelo Principal: Regressão Linear Múltipla...")
+        modelo_linear = LinearRegression()
+        modelo_linear.fit(X_train, y_train)
+        
+        # Predicoes e Calculo de Indicadores de Acerto
+        y_pred_linear = modelo_linear.predict(X_test)
+        r2_linear = r2_score(y_test, y_pred_linear)
+        mae_linear = mean_absolute_error(y_test, y_pred_linear)
+
+        # --- MODELO 2: RANDOM FOREST REGRESSOR (COMPARATIVO) ---
+        print(" -> Treinando Modelo Comparativo: Random Forest Regressor...")
+        modelo_rf = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
+        modelo_rf.fit(X_train, y_train)
+        
+        y_pred_rf = modelo_rf.predict(X_test)
+        r2_rf = r2_score(y_test, y_pred_rf)
+        mae_rf = mean_absolute_error(y_test, y_pred_rf)
+
+        # -----------------------------------------------------------------
+        # ENVIO DE PARÂMETROS E MÉTRICAS PARA O SERVIDOR MLFLOW
+        # -----------------------------------------------------------------
+        # Salva as notas de acerto da Regressao Linear
+        mlflow.log_metric("r2_regressao_linear", r2_linear)
+        mlflow.log_metric("mae_regressao_linear", mae_linear)
+        
+        # Salva as notas de acerto do Random Forest
+        mlflow.log_metric("r2_random_forest", r2_rf)
+        mlflow.log_metric("mae_random_forest", mae_rf)
+
+        print("\n" + "-"*75)
+        print("BALANÇO DE ACURÁCIA PRECOGNITIVA (MÉTRIQUE RESULTADOS):")
+        print(f" -> Regressao Linear (Principal)  | R² (Acerto): {r2_linear * 100:.2f}% | MAE: {mae_linear:.4f}")
+        print(f" -> Random Forest (Comparativo)   | R² (Acerto): {r2_rf * 100:.2f}% | MAE: {mae_rf:.4f}")
+        print("-"*75)
+
+        # -----------------------------------------------------------------
+        # REGISTRO DO MODELO CAMPEÃO NO MODEL REGISTRY
+        # -----------------------------------------------------------------
+       
+        print("\n[MLOps] Salvando e registrando modelo no catalogo central do MLflow...")
+        mlflow.sklearn.log_model(
+            sk_model=modelo_linear,
+            artifact_path="modelo_linear_misis",
+            registered_model_name="Modelo_Energetico_BelAZ"
+        )
+        print("[MLOps] Sucesso! Modelo homologado e fixado no servidor.")
+
+
+
 if __name__ == "__main__":
     print("\n" + "="*75)
-    print("INICIALIZAÇÃO DE GOVERNANÇA COM MLFLOW")
+    print("FASE 5 - PARTE 5: PIPELINE DE TREINAMENTO E REGISTRO CENTRAL")
     print("="*75)
     
     try:
-        # Inicializa a conexão com o servidor MLflow
         inicializar_governanca_mlflow()
-        
-        # Ingestão e filtros existentes
         df_bruto = carregar_dados_historicos()
         if len(df_bruto) > 0:
             df_filtrado = aplicar_filtro_grubbs_nativo(df_bruto, 'efficiency_w_spec')
             conduzir_auditoria_turnos_gauss(df_filtrado)
+            
+            # Executa a nova Parte 5: Treina e registra no MLflow
+            executar_treinamento_e_registro_mlflow(df_filtrado)
             print("\n" + "="*75 + "\n")
         else:
             print("[Aviso] Banco de dados vazio.")
     except Exception as e:
-        print(f"[Erro] Falha no setup do MLflow na Parte 4: {e}")
+        print(f"[Erro] Falha no fechamento da Fase 5: {e}")
