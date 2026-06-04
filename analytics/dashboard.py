@@ -95,6 +95,7 @@ def carregar_modelo_dashboard_mlflow():
     except Exception:
         return None
 
+
 # =============================================================================
 # CONSTRUÇÃO DA INTERFACE VISUAL COMPLETA 
 # =============================================================================
@@ -135,7 +136,7 @@ try:
         "⚡ Consumo Específico", 
         "🛢️ Consumo Energético", 
         "🏋️ Volume de Trabalho",
-        "💰 Relatório Financeiro"
+        "💰 Relatório Financeiro (Lucros e Perdas)"
     ])
     
     if len(dados_planta) > 0:
@@ -179,22 +180,47 @@ try:
             st.pyplot(fig)
             
         with aba_financeiro:
-            st.markdown("**Avaliação do Impacto Econômico em Expressão Financeira**")
+            # =========================================================================
+            # INTEGRAÇÃO COMPLETA: CENTRAL DE ANÁLISE FINANCEIRA DA МИСИС (LUCROS E PERDAS)
+            # =========================================================================
+            st.markdown("### 💰 Avaliação da Eficiência em Expressão Financeira")
+            st.markdown("Cálculo do impacto monetário baseado na fórmula oficial da página 48 do manual da universidade.")
+            
             TARIFA_COMBUSTIVEL = 6.00
             
-            # Puxa os dados para a equação financeira de perdas e lucros da página 48 do manual
+            # Busca os dados reais consolidados direto do banco pelas views de turno
             q_s1, _, w_f1 = buscar_metricas_consolidadas("1º Turno (Smena 1 - Diurno)")
             q_s2, _, w_f2 = buscar_metricas_consolidadas("2º Turno (Smena 2 - Noturno)")
-            w_p1, w_p2 = 52.50, 54.00
+            w_p1, w_p2 = 52.50, 54.00  # Metas lineares estabelecidas de rampa
             
+            # Aplicação da Equação: Economia/Perda = ((w_plan - w_fact) * Q * Tarifa) / 1.000.000
             ganho_s1 = ((w_p1 - w_f1) * q_s1 * TARIFA_COMBUSTIVEL) / 1000000.0
             ganho_s2 = ((w_p2 - w_f2) * q_s2 * TARIFA_COMBUSTIVEL) / 1000000.0
+            ganho_total_diario = ganho_s1 + ganho_s2
             
+            # Sub-layout interno de Cards Executivos de Lucro e Perda
+            f_col1, f_col2, f_col3 = st.columns(3)
+            with f_col1:
+                st.metric(label="BALANÇO FINANCEIRO - 1º TURNO", value=f"R$ {ganho_s1:,.2f}", 
+                          delta="Economia (Lucro)" if ganho_s1 >= 0 else "Sobreconsumo (Perda)",
+                          delta_color="normal" if ganho_s1 >= 0 else "inverse")
+            with f_col2:
+                st.metric(label="BALANÇO FINANCEIRO - 2º TURNO", value=f"R$ {ganho_s2:,.2f}", 
+                          delta="Economia (Lucro)" if ganho_s2 >= 0 else "Sobreconsumo (Perda)",
+                          delta_color="normal" if ganho_s2 >= 0 else "inverse")
+            with f_col3:
+                st.metric(label="IMPACTO TOTAL CONSOLIDADO (СУТКИ)", value=f"R$ {ganho_total_diario:,.2f}", 
+                          delta="Saldo Positivo" if ganho_total_diario >= 0 else "Saldo Negativo",
+                          delta_color="off")
+            
+            st.markdown("---")
+            
+            # Matriz de dados formatada idêntica à planilha oficial da МИСИС
             matriz_misis = {
                 "Indicador Operacional (ПАКУЭ)": [
                     "Consumo Alvo I.A. [w_plan]", "Consumo Real Médio [w_fact]", 
                     "Eficiência Diferencial [Δ w]", "Trabalho de Transporte Real [Q]", 
-                    "Resultado Financeiro do Turno"
+                    "Resultado Financeiro do Lote"
                 ],
                 "1º Turno (Смена 1)": [
                     f"{w_p1:.2f} g/t·km", f"{w_f1:.2f} g/t·km", f"{(w_p1 - w_f1):.2f} g/t·km",
@@ -207,15 +233,17 @@ try:
             }
             st.table(pd.DataFrame(matriz_misis))
             
-            st.markdown("💡 *Deseja visualizar a auditoria analítica completa de perdas e lucros com cartões executivos?*")
-            if st.button("Ir para Página Financeira Completa"):
-                st.switch_page("pages/http://localhost:8503")
+            # Destorques e Alertas Visuais Baseados na Lei de Gauss de Lucros
+            if ganho_total_diario >= 0:
+                st.success(f"📈 SUCESSO INDUSTRIAL: A operação gerou uma economia líquida de R$ {ganho_total_diario:,.2f} para a mineradora devido à alta eficiência de condução da frota.")
+            else:
+                st.error(f"ALERTA FINANCEIRO: O desvio operacional resultou em um prejuízo de R$ {abs(ganho_total_diario):,.2f} no custo de óleo diesel.")
     else:
         st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem.")
         
     st.markdown("---")
     
-    # Central de Alertas e Visão Geral
+    # Central de Alertas e Visão Geral de Telemetria
     b_col1, b_col2 = st.columns(2)
     with b_col1:
         st.subheader("🚨 Central de Alertas Críticos de Ineficiência")
@@ -228,10 +256,10 @@ try:
         st.subheader("📋 Últimas Telemetrias Recebidas (Visão Geral):")
         st.dataframe(dados_planta.tail(5), use_container_width=True)
 
-    # Ciclo contínuo de auto-refresh de 5 segundos (Fase 7 - Parte 4)
+    # Ciclo contínuo de auto-refresh de 5 segundos
     time.sleep(5)
     st.rerun()
 
-# Fechamento seguro do bloco de exceção principal
+# Fechamento seguro do bloco try/except contra erros de compilação
 except Exception as e:
     st.error(f"Erro ao renderizar o ecossistema analítico e de abas do Dashboard: {e}")
