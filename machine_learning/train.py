@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 import os
+import mlflow
+import mlflow.sklearn
 
 def conectar_banco():
     """Conecta ao TimescaleDB local no Docker de forma offline (Fase 1)"""
@@ -159,23 +161,52 @@ def conduzir_auditoria_turnos_gauss(df_filtrado):
 
 
 
+def inicializar_governanca_mlflow():
+    """
+    Configura a rota de conexão offline com o servidor MLflow no Docker
+    e estabelece o experimento oficial de monitoramento do BelAZ-75306.
+    """
+    print("\n" + "="*75)
+    print("[MLES - MLOps] Conectando ao Servidor Central do MLflow (Porta 5000)...")
+    
+    # Aponta para o endereço do contêiner Docker
+    mlflow.set_tracking_uri("http://localhost:5000")
+    
+    nome_experimento = "Gestao_Energetica_BelAZ_75306"
+    
+    # Verifica se o experimento já existe, senão cria um novo
+    experimento = mlflow.get_experiment_by_name(nome_experimento)
+    if experimento is None:
+        id_experimento = mlflow.create_experiment(
+            name=nome_experimento,
+            artifact_location="mlflow-artifacts:/"
+        )
+        print(f" -> Novo experimento criado com sucesso! ID: {id_experimento}")
+    else:
+        id_experimento = experimento.experiment_id
+        print(f" -> Vinculado ao experimento existente. ID: {id_experimento}")
+        
+    mlflow.set_experiment(nome_experimento)
+    print("="*75 + "\n")
+    return id_experimento
+
 
 if __name__ == "__main__":
     print("\n" + "="*75)
-    print("SEGREGAÇÃO E AUDITORIA DE TURNOS (ПАКУЭ)")
+    print("INICIALIZAÇÃO DE GOVERNANÇA COM MLFLOW")
     print("="*75)
     
     try:
-        # Ingestão de dados
+        # Inicializa a conexão com o servidor MLflow
+        inicializar_governanca_mlflow()
+        
+        # Ingestão e filtros existentes
         df_bruto = carregar_dados_historicos()
         if len(df_bruto) > 0:
-            # Filtro de Grubbs
             df_filtrado = aplicar_filtro_grubbs_nativo(df_bruto, 'efficiency_w_spec')
-            
-            # Executa o loop de auditoria segregado por Turnos
             conduzir_auditoria_turnos_gauss(df_filtrado)
             print("\n" + "="*75 + "\n")
         else:
-            print("[Aviso] Banco de dados vazio. Execute a ingestão em Go.")
+            print("[Aviso] Banco de dados vazio.")
     except Exception as e:
-        print(f"[Erro] Falha no teste da Parte 3.3: {e}")
+        print(f"[Erro] Falha no setup do MLflow na Parte 4: {e}")
