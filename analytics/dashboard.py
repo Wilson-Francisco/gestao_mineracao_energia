@@ -10,7 +10,7 @@ import time
 
 # 1. Configuração estrita do Layout Web da página do Streamlit
 st.set_page_config(
-    page_title="ПАКУЭ - Painel de Controle BelAZ-75306",
+    page_title="Painel de Controle BelAZ-75306",
     page_icon="🚚",
     layout="wide"
 )
@@ -23,38 +23,29 @@ def conectar_banco():
     )
 
 def buscar_dados_brutos(escopo_filtro):
-    """
-    CORREÇÃO DE SINCRONISMO: Altera dinamicamente a origem dos dados dos gráficos 
-    apontando para as Views de Turnos 1, 2 ou Diário conforme a seleção na tela.
-    """
+    """Fase 7 Concluída: Filtra e extrai os dados das Views de Turno para os gráficos"""
     conn = conectar_banco()
-    
     if escopo_filtro == "1º Turno (Smena 1 - Diurno)":
         query = """
             SELECT periodo_fechamento AS timestamp, total_producao_t_km AS production_q, 
                    total_consumo_t AS consumption_w, consumo_especifico_g_t_km AS efficiency_w_spec 
-            FROM v_kpi_primeiro_turno 
-            ORDER BY periodo_fechamento DESC LIMIT 30;
+            FROM v_kpi_primeiro_turno ORDER BY periodo_fechamento DESC LIMIT 30;
         """
     elif escopo_filtro == "2º Turno (Smena 2 - Noturno)":
         query = """
             SELECT periodo_fechamento AS timestamp, total_producao_t_km AS production_q, 
                    total_consumo_t AS consumption_w, consumo_especifico_g_t_km AS efficiency_w_spec 
-            FROM v_kpi_segundo_turno 
-            ORDER BY periodo_fechamento DESC LIMIT 30;
+            FROM v_kpi_segundo_turno ORDER BY periodo_fechamento DESC LIMIT 30;
         """
     else:
         query = """
             SELECT dia_fechamento AS timestamp, total_producao_t_km AS production_q, 
                    total_consumo_t AS consumption_w, consumo_especifico_g_t_km AS efficiency_w_spec 
-            FROM v_kpi_diario 
-            ORDER BY dia_fechamento DESC LIMIT 30;
+            FROM v_kpi_diario ORDER BY dia_fechamento DESC LIMIT 30;
         """
-        
     df = pd.read_sql_query(query, conn)
     conn.close()
     return df.iloc[::-1].reset_index(drop=True)
-
 
 def buscar_metricas_consolidadas(escopo_filtro):
     """Parte 2 Concluída: Busca os KPIs agregados das views do banco"""
@@ -76,7 +67,7 @@ def buscar_metricas_consolidadas(escopo_filtro):
     return prod_q, cons_w, w_spec
 
 def buscar_total_alertas_ia():
-    """Conta as anomalias gravadas no banco de forma bruta"""
+    """Parte 2 Concluída: Conta as anomalias gravadas no banco"""
     conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM anomaly_alerts;")
@@ -86,134 +77,115 @@ def buscar_total_alertas_ia():
     return int(total[0]) if total and total[0] is not None else 0
 
 def buscar_tabela_alertas():
-    """Extrai os últimos 5 logs de alertas disparados pela IA"""
+    """Parte 4 Concluída: Extrai os últimos 5 logs de alertas"""
     conn = conectar_banco()
-    query = """
-        SELECT timestamp, asset_id, metric_type, description, severity 
-        FROM anomaly_alerts 
-        ORDER BY timestamp DESC 
-        LIMIT 5;
-    """
+    query = "SELECT timestamp, asset_id, metric_type, description, severity FROM anomaly_alerts ORDER BY timestamp DESC LIMIT 5;"
     df = pd.read_sql_query(query, conn)
     conn.close()
     return df
 
 @st.cache_resource
 def carregar_modelo_dashboard_mlflow():
-    """Baixa o cérebro preditivo diretamente do MLflow"""
+    """Parte 3 Concluída: Baixa o cérebro preditivo diretamente do MLflow"""
     try:
         mlflow.set_tracking_uri("http://localhost:5000")
         run_id_campeao = "3952bcc5c570464fb557f75b64aee39d"
-        model_uri = f"runs:/{run_id_campeao}/modelo_linear_misis"
-        return mlflow.sklearn.load_model(model_uri)
-    except Exception as e:
+        return mlflow.sklearn.load_model(f"runs:/{run_id_campeao}/modelo_linear_misis")
+    except Exception:
         return None
 
-# --- CONSTRUÇÃO DA INTERFACE VISUAL COMPLETA (FADRÃO ПАКУЭ) ---
-st.title("🚚 Sistema De Monitoramento Energético BelAZ-75306")
-st.markdown("Gestão contínua da eficiência e consumo de combustível da frota integrada à Inteligência Artificial da universidade **МИСИС**.")
+# --- CONSTRUÇÃO DA INTERFACE VISUAL (PADRÃO REFORMULADO ПАКУЭ) ---
+st.title("🚚 Sistema ПАКУЭ — Monitoramento Energético BelAZ-75306")
+st.markdown("Análise gráfica unificada de indicadores industriais de transporte conforme o padrão regulatório **МИСИС**.")
 
-# Barra lateral de filtros
 st.sidebar.header("⚙️ Configurações de Auditoria")
 filtro_tempo = st.sidebar.selectbox(
     "Selecione o Escopo de Consolidação:",
     ["Consolidado Diário (Сутки)", "1º Turno (Smena 1 - Diurno)", "2º Turno (Smena 2 - Noturno)"]
 )
 st.sidebar.markdown("---")
-st.sidebar.info("💡 Interface integrada a nível de banco com atualizações contínuas.")
 
 try:
-    # Carga de dados analíticos
     producao_kpi, consumo_kpi, eficiencia_kpi = buscar_metricas_consolidadas(filtro_tempo)
     total_alertas = buscar_total_alertas_ia()
     modelo_linear = carregar_modelo_dashboard_mlflow()
     dados_planta = buscar_dados_brutos(filtro_tempo)
     df_alertas_logs = buscar_tabela_alertas()
     
-    # Renderização dos Cards de KPIs (Parte 2)
+    # Renderização dos Cards de KPIs
     st.subheader(f"📊 Indicadores Consolidados: {filtro_tempo.upper()}")
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric(label="TRABALHO DE TRANSPORTE ACUMULADO", value=f"{producao_kpi:,.2f} t·km", delta="Fechamento Turno")
-    with col2: st.metric(label="MASSA DE DIESEL CONSUMIDA", value=f"{consumo_kpi:,.4f} t", delta="Gasto de Massa", delta_color="inverse")
-    with col3: st.metric(label="CONSUMO ESPECÍFICO REAL", value=f"{eficiencia_kpi:,.2f} g/t·km", delta="w = (W * 10⁶) / Q")
-    with col4:
-        status_frota = "Estável" if total_alertas == 0 else "Crítico"
-        st.metric(label="ANOMALIAS CAPTURADAS POR I.A.", value=f"{total_alertas} Eventos", delta=f"Status: {status_frota}", delta_color="off" if total_alertas == 0 else "inverse")
+    with col1: st.metric(label="TRABALHO DE TRANSPORTE ACUMULADO", value=f"{producao_kpi:,.2f} t·km")
+    with col2: st.metric(label="MASSA DE DIESEL CONSUMIDA", value=f"{consumo_kpi:,.4f} t")
+    with col3: st.metric(label="CONSUMO ESPECÍFICO REAL", value=f"{eficiencia_kpi:,.2f} g/t·km")
+    with col4: st.metric(label="ANOMALIAS CAPTURADAS POR I.A.", value=f"{total_alertas} Eventos")
         
     st.markdown("---")
     
     # -----------------------------------------------------------------
-    # GRÁFICOS REFORMULADOS: COMPARAÇÃO TEMPORAL DIÁRIA (CONFORME IMAGEM)
+    # REFATORAÇÃO: PLOTAGEM DO PAINEL DE GRÁFICOS TRIPLO VERTICAL
     # -----------------------------------------------------------------
-    st.subheader("📈 Análise de Eficiência: Histórico de Consumo Específico")
+    st.subheader("📈 Painel Unificado de Controle Operacional (MИСИС - ПАКУЭ)")
     
-    # Processamento de Vetores Analíticos
-    dados_planta['timestamp'] = pd.to_datetime(dados_planta['timestamp'])
-    # Formata a data para exibir apenas o dia/mês no eixo X (ex: 04.06) conforme a imagem enviada
-    eixo_x_datas = dados_planta['timestamp'].dt.strftime('%d.%m').to_numpy()
-    
-    w_spec_real = dados_planta['efficiency_w_spec'].to_numpy()
-    
-    # Inferência da Inteligência Artificial para gerar o consumo alvo/esperado
-    matriz_entrada = dados_planta[['production_q', 'consumption_w']].to_numpy()
-    w_spec_predito = modelo_linear.predict(matriz_entrada) if modelo_linear is not None else np.zeros_like(w_spec_real)
-    
-    # Configura o estilo limpo de plotagem do Seaborn
-    sns.set_theme(style="whitegrid")
-    g_col1, g_col2 = st.columns(2)
-    
-    with g_col1:
-        st.markdown("**Gráfico de Acompanhamento Temporal (Padrão ПАКУЭ)**")
-        fig1, ax1 = plt.subplots(figsize=(6, 3.5))
+    if len(dados_planta) > 0:
+        dados_planta['timestamp'] = pd.to_datetime(dados_planta['timestamp'])
+        eixo_x_datas = dados_planta['timestamp'].dt.strftime('%d.%m').to_numpy()
         
-        # 1. Linha do Consumo Específico Real (Azul) - "Факт"
-        ax1.plot(eixo_x_datas, w_spec_real, color="#1E90FF", marker='o', linewidth=2, label="Real (Факт)")
+        Q_bruto = dados_planta['production_q'].to_numpy()
+        W_bruto = dados_planta['consumption_w'].to_numpy()
+        w_spec_real = dados_planta['efficiency_w_spec'].to_numpy()
         
-        # 2. Linha do Consumo Específico Esperado pela I.A. (Vermelho) - "Ожидаемое"
-        ax1.plot(eixo_x_datas, w_spec_predito, color="#FF4500", marker='o', linewidth=2, label="Planejado I.A. (Ожидаемое)")
+        # Executa a inferência ao vivo da I.A. para gerar a linha alvo
+        matriz_entrada = dados_planta[['production_q', 'consumption_w']].to_numpy()
+        w_spec_predito = modelo_linear.predict(matriz_entrada) if modelo_linear is not None else np.zeros_like(w_spec_real)
         
-        # Preenchimento translúcido sob as curvas igual ao modelo da imagem enviada
-        ax1.fill_between(eixo_x_datas, w_spec_real, color="#1E90FF", alpha=0.1)
-        ax1.fill_between(eixo_x_datas, w_spec_predito, color="#FF4500", alpha=0.05)
+        # Cria a figura com 3 subplots empilhados verticalmente compartilhando o eixo X
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(11, 8), sharex=True)
+        sns.set_theme(style="whitegrid")
         
-        ax1.set_xlabel("Data do Turno")
-        ax1.set_ylabel("Consumo Específico w (g/t·km)")
-        ax1.legend(loc="upper right")
-        plt.xticks(rotation=30, ha='right') # Inclina as datas do eixo X para melhor legibilidade
-        st.pyplot(fig1)
+        # --- GRÁFICO 1: Volume de Trabalho de Transporte [t·km] ---
+        ax1.plot(eixo_x_datas, Q_bruto, color="#1E90FF", marker='o', linewidth=1.8, label="Trabalho de Transporte (Произв. показатель)")
+        ax1.axhline(0, color="#FF4500", linestyle='-', linewidth=1.2) # Linha vermelha base da imagem
+        ax1.set_ylabel("Volume [t·km]", fontsize=9)
+        ax1.title.set_text("1. Trabalho de Transporte Real Coletado")
         
-    with g_col2:
-        st.markdown("**Gráfico de Correlação e Linha de Base**")
-        fig2, ax2 = plt.subplots(figsize=(6, 3.5))
-        Q_real = dados_planta['production_q'].to_numpy()
-        indices_ordenados = np.argsort(Q_real)
+        # --- GRÁFICO 2: Gasto Energético Absoluto [t] ---
+        ax2.plot(eixo_x_datas, W_bruto, color="#1E90FF", marker='o', linewidth=1.8, label="Gasto de Óleo Diesel")
+        ax2.set_ylabel("Consumo [t]", fontsize=9)
+        ax2.title.set_text("2. Consumo Absoluto de Massa de Combustível")
         
-        sns.scatterplot(x=Q_real, y=w_spec_real, color="dimgray", alpha=0.4, label="Medição Real", ax=ax2)
-        sns.lineplot(x=Q_real[indices_ordenados], y=w_spec_predito[indices_ordenados], color="indigo", linewidth=2.5, label="Meta Planejada (МИСИС)", ax=ax2)
-        ax2.set_xlabel("Trabalho de Transporte Q (t·km)")
-        ax2.set_ylabel("Consumo Específico Planejado w (g/t·km)")
-        ax2.legend()
-        st.pyplot(fig2)
+        # --- GRÁFICO 3: Consumo Específico Real vs Meta I.A. [g/t·km] ---
+        ax3.plot(eixo_x_datas, w_spec_real, color="#1E90FF", marker='o', linewidth=1.8, label="Real (Факт)")
+        ax3.plot(eixo_x_datas, w_spec_predito, color="#FF4500", marker='o', linewidth=1.8, label="Alvo I.A. (Плановое)")
+        ax3.set_ylabel("Específico [g/t·km]", fontsize=9)
+        ax3.set_xlabel("Data do Ciclo (Dia.Mês)", fontsize=10)
+        ax3.title.set_text("3. Eficiência de Ciclo: Consumo Específico Real vs Linha de Base I.A.")
+        ax3.legend(loc="upper right", frameon=True, facecolor="white")
+        
+        # Ajustes de layout para rotular o eixo X de forma limpa
+        plt.xticks(rotation=0)
+        plt.tight_layout()
+        st.pyplot(fig)
+    else:
+        st.info("Aguardando novas inserções nas Views do banco para iniciar a plotagem do painel triplo.")
         
     st.markdown("---")
     
-    # Central de Alertas Visuais & Visão Geral (Parte 4)
+    # Central de Alertas e Tabela Geral
     b_col1, b_col2 = st.columns(2)
     with b_col1:
         st.subheader("🚨 Central de Alertas Críticos de Ineficiência")
         if len(df_alertas_logs) == 0:
-            st.info("Nenhuma anomalia de sobreconsumo registrada pelo modelo de I.A. nas últimas operações.")
+            st.info("Nenhuma anomalia de sobreconsumo registrada pelo modelo de I.A.")
         else:
             for idx, row in df_alertas_logs.iterrows():
                 st.error(f"⚠️ **Ativo BelAZ ID: {row['asset_id']}** | {row['timestamp']} | **{row['severity']}**\n\n{row['description']}")
-                
     with b_col2:
         st.subheader("📋 Últimas Telemetrias Recebidas (Visão Geral):")
         st.dataframe(dados_planta.tail(5), use_container_width=True)
 
-    # Sistema de atualização automática de tela a cada 5 segundos
     time.sleep(5)
     st.rerun()
     
 except Exception as e:
-    st.error(f"Erro ao renderizar a central de auditoria e alertas: {e}")
+    st.error(f"Erro ao renderizar a central de auditoria gráfica: {e}")
