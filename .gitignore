@@ -1,18 +1,44 @@
-# Ambientes virtuais Python (Locais)
+# === AMBIENTES VIRTUAIS E DEPENDÊNCIAS PYTHON ===
+# Oculta a pasta pesada de downloads de bibliotecas locais do Python
 venv/
 .venv/
+env/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 
-# Arquivos temporários de IDEs (VS Code / Windows)
-.vscode/
-.idea/
-Thumbs.db
+# === GO (GOLANG) ===
+# Oculta os executáveis gerados temporariamente na compilação do Go
+backend/cmd/collector/collector.exe
+backend/cmd/collector/collector
+backend/cmd/server/server.exe
+backend/cmd/server/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Arquivos de imagem exportados localmente pelo Dashboard
-*.png
-*.jpg
-
-# Banco de dados local e artefatos de experimentos do MLflow (Crucial)
+# === GOVERNANÇA E ARTEFATOS DO MLFLOW (CRUCIAL) ===
+# Oculta o banco de dados de experimentos e os arquivos binários locais do MLflow
 mlruns/
 mlflow.db
+
+# === DOCKER E VOLUMES DE DADOS ===
+# Impede o envio de pastas locais de dados persistidos do banco ou lixo do Docker
+.docker/
+data/
+db_data/
+
+# === ARQUIVOS TEMPORÁRIOS DE IDEs E SISTEMA OPERACIONAL ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# === ARTEFATO VISUAL LOCAL ===
+analytics/*.png
+analytics/*.jpg
