@@ -265,6 +265,23 @@ def executar_treinamento_e_registro_mlflow(df_filtrado):
         print("[MLOps] Sucesso! Modelo homologado e fixado no servidor.")
 
 
+        # -----------------------------------------------------------------
+        # PROMOÇÃO AUTOMATIZADA PARA ESTÁGIO DE PRODUÇÃO
+        # -----------------------------------------------------------------
+        print("[MLOps] Promovendo modelo registrado para o estágio 'Production'...")
+        from mlflow.tracking import MlflowClient
+        client = MlflowClient()
+        
+        # Carimba a Versão 1 do Modelo como o Campeão oficial da Frota BelAZ
+        client.transition_model_version_stage(
+            name="Modelo_Energetico_BelAZ",
+            version=1,
+            stage="Production",
+            archive_existing_versions=True # Arquiva versões antigas automaticamente
+        )
+        print("[MLOps] Sucesso! Modelo promovido e pronto para producao.")
+
+
 
 if __name__ == "__main__":
     print("\n" + "="*75)
