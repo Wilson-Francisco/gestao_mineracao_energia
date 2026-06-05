@@ -5,7 +5,7 @@
 [![Docker](https://shields.io)](https://docker.com)
 [![MLflow](https://shields.io)](https://mlflow.org)
 
-Este repositório hospeda a reconstrução industrial do ecossistema de software **ПАКУЭ**, baseado nas diretrizes e equações da universidade **МИСИС (Rússia)**. O sistema gerencia, analisa e audita a intensidade energética e o consumo de combustível da frota de caminhões fora de estrada **BelAZ-75306** (capacidade de 220 toneladas) operando em cavas de mineração de grande porte.
+Este repositório hospeda a reconstrução industrial do ecossistema de software de gestão energética. O sistema gerencia, analisa e audita a intensidade energética e o consumo de combustível da frota de caminhões fora de estrada **BelAZ-75306** (capacidade de 220 toneladas) operando em cavas de mineração de grande porte.
 
 ---
 
@@ -26,24 +26,24 @@ Este repositório hospeda a reconstrução industrial do ecossistema de software
 
 ---
 
-## 🧬 Fundamentos Científicos & Regras de Negócio (МИСИС)
+## 🧬 Fundamentos Científicos & Regras de Negócio
 
-### 1. Modelagem Física de Borda (Fase 3)
+### 1. Modelagem Física de Borda
 O computador de bordo simula os sensores do barramento CAN-Bus do veículo separando ciclos carregados de ciclos em vazio. Ele realiza *Edge Computing* para derivar as variáveis centrais:
 * **Trabalho de Transporte Útil ($Q$):** $Q = \text{Peso Útil } [t] \times \text{Distância } [km]$
 * **Massa de Combustível ($W$):** Conversão contínua de gramas injetadas para Toneladas $[t]$.
 * **Consumo Específico Real ($w_{\text{real}}$):** $w_{\text{real}} = \frac{W \times 10^6}{Q} \quad [g/t\cdot km]$
 
-### 2. Controle Estatístico de Gauss (Fase 5)
+### 2. Controle Estatístico de Gauss
 Antes da modelagem preditiva, aplica-se o **Filtro de Smirnov-Grubbs** de forma iterativa para expurgar outliers causados por trepidações extremas de pista. A normalidade da amostra é auditada via teste inferencial de **Shapiro-Wilk** segregada por turnos industriais:
 * **1º Turno (Smena 1):** 08:00h às 19:59h UTC
 * **2º Turno (Smena 2):** 20:00h às 07:59h UTC
 * **Diário (Сутки):** Consolidação assíncrona executada via *Continuous Aggregations* no banco.
 
-### 3. Modelo Preditivo Principal (Linha de Base)
+### 3. Modelo Preditivo Principal
 O modelo principal é uma **Regressão Linear Múltipla** devido à sua total interpretabilidade física para o planejamento de metas, tendo o **Random Forest Regressor** ($R^2 = 99.51\%$) como benchmark analítico não-linear.
 
-### 4. Impacto Econômico e Financeiro (Fase 7)
+### 4. Impacto Econômico e Financeiro 
 A avaliação monetária da eficiência segue a equação da página 48 do manual:
 $$\mathbf{Э_{э\ м\ i} = (w_{пл\ м\ i} - w_{ф\ ср\ i}) \cdot Q_{ф\ i} \cdot Ц_э}$$
 Onde $Ц_э$ representa a tarifa do óleo diesel configurada na plataforma (R$ 6,00/kg).
@@ -67,18 +67,18 @@ Onde $Ц_э$ representa a tarifa do óleo diesel configurada na plataforma (R$ 6
 * Go (Golang) instalado na máquina.
 * Python 3.10+ configurado.
 
-### Passo 1: Erguer a Infraestrutura Docker
+### Erguer a Infraestrutura Docker
 Na raiz do projeto, execute o orquestrador para ligar o banco, o broker e o painel de MLOps:
 ```bash
 docker compose up -d
 ```
 
-### Passo 2: Inicializar o Banco de Dados (Injeção de Tabelas)
+### Inicializar o Banco de Dados (Injeção de Tabelas)
 ```bash
 Get-Content backend/sql/init.sql | docker exec -i minera_db psql -U admin -d energy_management
 ```
 
-### Passo 3: Iniciar a Camada de Ingestão (Go)
+### Iniciar a Camada de Ingestão (Go)
 Abra dois terminais paralelos para rodar o Server central e o Coletor veicular:
 ```bash
 # Terminal do Server
@@ -88,7 +88,7 @@ cd backend/cmd/server && go run main.go
 cd backend/cmd/collector && go run main.go
 ```
 
-### Passo 4: Executar Treinamento da I.A. & Monitoramento
+### Executar Treinamento da I.A. & Monitoramento
 Com o ambiente virtual `venv` ativo e dependências instaladas:
 ```bash
 # Executa o Pipeline e registra o modelo campeão no MLflow (Port 5000)
@@ -98,7 +98,7 @@ cd machine_learning && python train.py
 cd analytics && python main.py
 ```
 
-### Passo 5: Abrir o Painel Corporativo (Streamlit)
+### Abrir o Painel Corporativo (Streamlit)
 ```bash
 python -m streamlit run analytics/dashboard.py
 ```
