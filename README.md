@@ -102,4 +102,3 @@ cd analytics && python main.py
 ```bash
 python -m streamlit run analytics/dashboard.py
 ```
-Acesse `http://localhost:8501` no seu navegador de internet para auditar a frota e os relatórios financeiros de lucros e perdas integrados de forma sênior.
